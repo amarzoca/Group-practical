@@ -5,13 +5,22 @@ import (
     "strconv"
     //"bufio"
     "fmt"
-    //"time"
-    //"math/rand"
+    "time"
+    "math"
+    "encoding/json"
+    "io/ioutil"
 
     "github.com/santegoeds/oanda"
 )
 
-type dataType float64
+type dataType struct {
+    val float64
+    sd float64
+}
+func (d dataType) toString() string {
+        return (strconv.FormatFloat(float64(d.val), 'f', -1, 64) + ", " +
+                strconv.FormatFloat(float64(d.sd), 'f', -1, 64))
+    }
 
 func main() {
     server, _ := net.Listen("tcp", ":3540")
@@ -23,10 +32,12 @@ func main() {
 
     joiningClients := make(chan net.Conn)
     d := make(chan dataType, 1024);
+    proc := make(chan float64)
 
     go acceptor(server, joiningClients);
-    go handler(joiningClients, d)
-    data(d, client);
+    go handler(joiningClients, d);
+    go processData(proc, d)
+    historicalData(client, proc);
 }
 
 func handler(joiningClients chan net.Conn, input chan dataType) {
@@ -37,7 +48,7 @@ func handler(joiningClients chan net.Conn, input chan dataType) {
                 conn = append(conn, jc)
             case i := <-input:
                 for _, elem := range conn {
-                    elem.Write([]byte("" + strconv.FormatFloat(float64(i), 'f', -1, 64) + "\n"))
+                    elem.Write([]byte("" + i.toString() + "\n"))
                 }
         }
     }
@@ -55,9 +66,8 @@ func acceptor(listener net.Listener, output chan net.Conn) {
     }
 }
 
-//var access_token string = "634396fa2010f81d4a362e6edc6269e1-7b55b84dac91e4da6373310aae581b87"
-var access_token string = "919c4660dd9eede2373d1d00648559c5-5ff4354696aef8bdd02fac15256ebb56"
-var accountId oanda.Id = 1956907
+var access_token string = "access_token"
+var accountId oanda.Id = "accountId"
 
 func connectToAPI() *oanda.Client {
     client, err := oanda.NewFxPracticeClient(access_token)
@@ -70,21 +80,79 @@ func connectToAPI() *oanda.Client {
     return client
 }
 
-func data(out chan dataType, client *oanda.Client) {
-    // Create and run a price server.
+func liveData(client *oanda.Client, proc chan float64) {
     priceServer, err := client.NewPriceServer("GBP_USD")
     if err != nil {
-
         panic(err)
     }
-    lastValue := float64(0)
+
+    var lastValue float64 = 0
     priceServer.HeartbeatFunc = func(hb oanda.Time) {
-        //fmt.Printf("Heartbeat: %s \n", hb)
-        out <- dataType(lastValue);
-        fmt.Printf("%f written\n", lastValue)
+        proc <- lastValue;
     }
     priceServer.ConnectAndHandle(func(instrument string, tick oanda.PriceTick) {
         lastValue = tick.Bid;
-        fmt.Printf("%f stored\n", lastValue)
     })
+
 }
+
+func historicalData(client *oanda.Client, proc chan float64) {
+    type StreamType struct {
+        Instrument string
+        Granularity string
+        Candles []struct {
+            Time time.Time
+            Bid float64
+            Complete bool
+        }
+    }
+    var data StreamType
+    file, err := ioutil.ReadFile("dataD2002.json")
+    if err != nil {
+        panic(err.Error())
+    }
+    err = json.Unmarshal(file, &data)
+    if err != nil {
+        fmt.Println(err)
+    }
+    
+    for {
+        for i := 0; i < len(data.Candles); i++ {
+            proc <- data.Candles[i].Bid
+            time.Sleep(2 * time.Second)
+        }
+    }
+}
+
+var sampleSize, n = 50, 0
+var runningMean, runningSumSq float64 = 0, 0
+var queue = make([]float64, 0)
+
+func processData(in chan float64, out chan dataType) float64 {
+    for {
+        lastVal := <-in
+        queue = append(queue, lastVal)
+        oldMean := runningMean
+
+        if(n < sampleSize) {
+            n += 1
+            runningMean += (lastVal - runningMean)/float64(n)
+            runningSumSq += (lastVal - runningMean)*(lastVal - oldMean)
+        } else {
+            oldVal := queue[0]; queue = queue[1:]
+            runningMean += (lastVal - oldVal)/float64(sampleSize)
+
+            runningSumSq = 0
+            for i := 0; i < sampleSize; i++ {
+                runningSumSq += (queue[i] - runningMean)*(queue[i] - runningMean)
+            }
+        }
+        var sd float64 = 0
+        if(n > 1) {
+            sd = math.Sqrt(runningSumSq/float64(n-1))
+        }
+        out <- dataType{lastVal, sd}
+        fmt.Printf("%f, %f written\n", lastVal, sd)
+    }
+}
+
