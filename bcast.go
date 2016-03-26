@@ -28,8 +28,6 @@ func main() {
         panic("Failed to open listening port")
     }
 
-    client := connectToAPI()
-
     joiningClients := make(chan net.Conn)
     d := make(chan dataType, 1024);
     proc := make(chan float64)
@@ -37,7 +35,7 @@ func main() {
     go acceptor(server, joiningClients);
     go handler(joiningClients, d);
     go processData(proc, d)
-    historicalData(client, proc);
+    historicalData(proc);
 }
 
 func handler(joiningClients chan net.Conn, input chan dataType) {
@@ -75,12 +73,14 @@ func connectToAPI() *oanda.Client {
         panic(err)
     }
 
-    client.SelectAccount(1956907)
+    client.SelectAccount(accountId)
 
     return client
 }
 
-func liveData(client *oanda.Client, proc chan float64) {
+func liveData(proc chan float64) {
+    client := connectToAPI()
+
     priceServer, err := client.NewPriceServer("GBP_USD")
     if err != nil {
         panic(err)
@@ -96,7 +96,7 @@ func liveData(client *oanda.Client, proc chan float64) {
 
 }
 
-func historicalData(client *oanda.Client, proc chan float64) {
+func historicalData(proc chan float64) {
     type StreamType struct {
         Instrument string
         Granularity string
