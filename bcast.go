@@ -3,25 +3,34 @@ package main
 import (
     "net"
     "strconv"
-    //"bufio"
+    "bufio"
     "fmt"
     "time"
     "math"
     "encoding/json"
     "io/ioutil"
+    "strings"
 
     "github.com/santegoeds/oanda"
 )
 
-type dataType struct {
-    val float64
-    sd float64
-}
-func (d dataType) toString() string {
-        return (strconv.FormatFloat(float64(d.val), 'f', -1, 64) + ", " +
-                strconv.FormatFloat(float64(d.sd), 'f', -1, 64))
-    }
+/* API login info */
+var access_token string = ""
+var accountId oanda.Id = 0
 
+/* The data to be sent out each tick */
+type dataType struct {
+    val float64 //instrument value
+    sd float64 //standard deviation
+}
+
+/* Format the data as a string for sending */
+func (d dataType) toString() string {
+    return (strconv.FormatFloat(float64(d.val), 'f', -1, 64) + ", " +
+            strconv.FormatFloat(float64(d.sd), 'f', -1, 64))
+}
+
+/* Entry point, start threads */
 func main() {
     server, _ := net.Listen("tcp", ":3540")
     if server == nil {
@@ -38,20 +47,8 @@ func main() {
     historicalData(proc);
 }
 
-func handler(joiningClients chan net.Conn, input chan dataType) {
-    conn := make([]net.Conn, 0);
-    for {
-        select {
-            case jc := <-joiningClients:
-                conn = append(conn, jc)
-            case i := <-input:
-                for _, elem := range conn {
-                    elem.Write([]byte("" + i.toString() + "\n"))
-                }
-        }
-    }
-}
-
+/* Thread for accepting new clients. Listens for clients, accepts their connections and writes
+them into a channel to be handled */
 func acceptor(listener net.Listener, output chan net.Conn) {
     for {
         client, _ := listener.Accept()
@@ -64,9 +61,39 @@ func acceptor(listener net.Listener, output chan net.Conn) {
     }
 }
 
-var access_token string = "access_token"
-var accountId oanda.Id = "accountId"
+/* Thread for handling data transfer. Writes data from input to all clients, and accepts new clients
+on joiningClients */
+//TODO: Clients are not removed from the list when they leave
+func handler(joiningClients chan net.Conn, input chan dataType) {
+    conn := make([]net.Conn, 0);
+    for {
+        select {
+            case jc := <-joiningClients:
+                conn = append(conn, jc)
+                go feedbackListener(jc)
+            case i := <-input:
+                for _, elem := range conn {
+                    elem.Write([]byte("" + i.toString() + "\n"))
+                }
+        }
+    }
+}
 
+/* Thread to handle feedback from an individual client */
+func feedbackListener(client net.Conn){
+    b := bufio.NewReader(client)
+    for {
+        line, err := b.ReadBytes('\n')
+        if err != nil {
+            fmt.Printf("Dropping %v\n", client.RemoteAddr())
+            break
+        }
+        sline := strings.TrimSuffix(string(line[:]),"\n")
+        fmt.Printf("%s received from %v\n", sline, client.RemoteAddr())
+    }
+}
+
+/* Make a connection to the finance api */
 func connectToAPI() *oanda.Client {
     client, err := oanda.NewFxPracticeClient(access_token)
     if err != nil {
@@ -78,6 +105,7 @@ func connectToAPI() *oanda.Client {
     return client
 }
 
+/* Thread that writes live data to the processing queue channel */
 func liveData(proc chan float64) {
     client := connectToAPI()
 
@@ -96,6 +124,7 @@ func liveData(proc chan float64) {
 
 }
 
+/* Thread that writes historical data to the processing queue channel */
 func historicalData(proc chan float64) {
     type StreamType struct {
         Instrument string
@@ -124,6 +153,8 @@ func historicalData(proc chan float64) {
     }
 }
 
+
+/* Thread that processes the data and writes it to the input channel for broadcasting */
 var sampleSize, n = 50, 0
 var runningMean, runningSumSq float64 = 0, 0
 var queue = make([]float64, 0)
