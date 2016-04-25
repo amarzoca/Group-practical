@@ -3,13 +3,11 @@ package main
 import (
     "net"
     "strconv"
-    "bufio"
     "fmt"
     "time"
     "math"
     "encoding/json"
     "io/ioutil"
-    "strings"
 
     "github.com/santegoeds/oanda"
 )
@@ -37,14 +35,19 @@ func main() {
         panic("Failed to open listening port")
     }
 
-    joiningClients := make(chan net.Conn)
+    joiningClients := make(chan net.Conn);
     d := make(chan dataType, 1024);
-    proc := make(chan float64)
+    proc := make(chan float64);
+    fba := make(chan string);
+    fbo := make(chan map[string]int);
+    tick := make(chan int);
 
     go acceptor(server, joiningClients);
-    go handler(joiningClients, d);
-    go processData(proc, d)
-    historicalData(proc);
+    go handler(joiningClients, d, fba);
+    go processData(proc, d, tick)
+    go historicalData(proc);
+    go feedbackAccumulator(fba, tick, fbo);
+    feedbackOutput(fbo);
 }
 
 /* Thread for accepting new clients. Listens for clients, accepts their connections and writes
@@ -64,32 +67,18 @@ func acceptor(listener net.Listener, output chan net.Conn) {
 /* Thread for handling data transfer. Writes data from input to all clients, and accepts new clients
 on joiningClients */
 //TODO: Clients are not removed from the list when they leave
-func handler(joiningClients chan net.Conn, input chan dataType) {
+func handler(joiningClients chan net.Conn, input chan dataType, fba chan string) {
     conn := make([]net.Conn, 0);
     for {
         select {
             case jc := <-joiningClients:
                 conn = append(conn, jc)
-                go feedbackListener(jc)
+                go feedbackListener(jc, fba)
             case i := <-input:
                 for _, elem := range conn {
                     elem.Write([]byte("" + i.toString() + "\n"))
                 }
         }
-    }
-}
-
-/* Thread to handle feedback from an individual client */
-func feedbackListener(client net.Conn){
-    b := bufio.NewReader(client)
-    for {
-        line, err := b.ReadBytes('\n')
-        if err != nil {
-            fmt.Printf("Dropping %v\n", client.RemoteAddr())
-            break
-        }
-        sline := strings.TrimSuffix(string(line[:]),"\n")
-        fmt.Printf("%s received from %v\n", sline, client.RemoteAddr())
     }
 }
 
@@ -159,7 +148,7 @@ var sampleSize, n = 50, 0
 var runningMean, runningSumSq float64 = 0, 0
 var queue = make([]float64, 0)
 
-func processData(in chan float64, out chan dataType) float64 {
+func processData(in chan float64, out chan dataType, tick chan int) float64 {
     for {
         lastVal := <-in
         queue = append(queue, lastVal)
@@ -183,6 +172,7 @@ func processData(in chan float64, out chan dataType) float64 {
             sd = math.Sqrt(runningSumSq/float64(n-1))
         }
         out <- dataType{lastVal, sd}
+        tick <- 0
         fmt.Printf("%f, %f written\n", lastVal, sd)
     }
 }
