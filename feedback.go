@@ -61,7 +61,7 @@ func socketHandler(data chan map[string]string) websocket.Handler {
   return func(ws *websocket.Conn) {
     for { 
         m := <-data;
-        var res = "Tick " + m["tick"] +": "
+        /*var res = "Tick " + m["tick"] +": "
       
         if(m["1"] == "" && m["-1"] == "") {
             res = res + "no buys/sells"
@@ -69,7 +69,10 @@ func socketHandler(data chan map[string]string) websocket.Handler {
             if(m["1"] != "") { res = res + m["1"] + " buys" }
             if(m["1"] != "" && m["-1"] != "") { res = res + " and " }
             if(m["-1"] != "") { res = res + m["-1"] + " sells" }
-        }
+        }*/
+        if(m["1"] == "") { m["1"] = "0" }
+        if(m["-1"] == "") { m["-1"] = "0" }
+        var res = m["tick"] + ", " + m["1"] + ", " + m["-1"]
         _, err := ws.Write([]byte(res))
         if err != nil {
             break

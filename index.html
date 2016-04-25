@@ -1,6 +1,8 @@
 <html>
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
 <script>
  
@@ -12,7 +14,20 @@
  
   // Write message on receive
   serversocket.onmessage = function(e) {
-    $('div').prepend("Received: " + e.data + "<br>");
+    console.log(e.data);
+    var array = e.data.split(",");
+
+    var tick = array[0];
+    var buys = array[1];
+    var sells = array[2];
+    console.log(tick + buys + sells);
+    if (array[1] == 0 && array[2] == 0)
+      var highlight = "";
+    else var highlight = "list-group-item-success";
+    $('#list').prepend(
+      "<li class='list-group-item " + highlight +" '> <span class='label label-default label-pill pull-xs-right '>" + array[1] + "</span> <span class='label label-default label-pill pull-xs-right'>" + array[2] + "</span> Tick received: " + array[0] + "</li>"
+    );
+
     //document.getElementById('comms').innerHTML += "Received: " + e.data + "<br>";         
   };
  
@@ -21,8 +36,10 @@
  
 </head>
 <body>
- 
-  <div id='comms'></div>
+  <div class="container">
+    <ul id="list" class="list-group"> </ul>
+
+  </div>
  
 </body>
 </html>
