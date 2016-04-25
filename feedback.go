@@ -19,7 +19,10 @@ func feedbackListener(client net.Conn, fba chan string){
             fmt.Printf("Dropping %v\n", client.RemoteAddr())
             break
         }
-        sline := strings.TrimSuffix(string(line[:]),"\n")
+        //fmt.Printf(string(line[:]))
+        sline := strings.TrimSuffix(string(line[:]),"\r\n")
+
+        //fmt.Printf(sline)
         fmt.Printf("%s received from %v\n", sline, client.RemoteAddr())
         fba <- sline
     }
@@ -47,7 +50,7 @@ func feedbackOutput(data chan map[string]string, outputWeb chan map[string]strin
     for {
         m := <-data;
         for k := range m {
-            if(k != "tick") { fmt.Printf("%s had %d feedback hits\n", k, m[k]); }
+            if(k != "tick") { fmt.Printf("%s had %s feedback hits\n", k, m[k]); }
         }
 
         select {

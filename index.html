@@ -21,9 +21,13 @@
     var buys = array[1];
     var sells = array[2];
     console.log(tick + buys + sells);
-    if (array[1] == 0 && array[2] == 0)
-      var highlight = "";
-    else var highlight = "list-group-item-success";
+
+    var highlight = "";
+    if (array[1] - array[2] > 0 && array[1] > 0)
+      highlight = "list-group-item-success";
+    else if(array[2] > 0) 
+      highlight = "list-group-item-danger";
+
     $('#list').prepend(
       "<li class='list-group-item " + highlight +" '> <span class='label label-default label-pill pull-xs-right '>" + array[1] + "</span> <span class='label label-default label-pill pull-xs-right'>" + array[2] + "</span> Tick received: " + array[0] + "</li>"
     );
