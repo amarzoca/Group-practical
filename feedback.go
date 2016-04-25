@@ -19,8 +19,8 @@ func feedbackListener(client net.Conn, fba chan string){
             fmt.Printf("Dropping %v\n", client.RemoteAddr())
             break
         }
-        //fmt.Printf(string(line[:]))
-        sline := strings.TrimSuffix(string(line[:]),"\r\n")
+        sline := strings.TrimSuffix(string(line[:]),"\n")
+        sline = strings.TrimSuffix(sline, "\r")
 
         //fmt.Printf(sline)
         fmt.Printf("%s received from %v\n", sline, client.RemoteAddr())
