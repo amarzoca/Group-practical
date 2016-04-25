@@ -5,6 +5,9 @@ import (
     "bufio"
     "fmt"
     "strings"
+    "strconv"
+
+    "golang.org/x/net/websocket"
 )
 
 /* Thread to handle feedback from an individual client */
@@ -23,25 +26,54 @@ func feedbackListener(client net.Conn, fba chan string){
 }
 
 /* Thread to accumulate all feedback from clients into a map each tick */
-func feedbackAccumulator(fba chan string, tick chan int, output chan map[string]int){
-    var m map[string]int
+func feedbackAccumulator(fba chan string, tick chan float64, 
+        output chan map[string]string){
+    var m map[string]string
     for {
         select {
             case v := <-fba:
-                m[v] = m[v] + 1
-            case <-tick:
+                i, _ := strconv.Atoi(m[v])
+                m[v] = strconv.Itoa(i + 1)
+            case tick := <-tick:
                 output <- m
-                m = make(map[string]int)
+                m = make(map[string]string)
+                m["tick"] = strconv.FormatFloat(tick, 'f', -1, 64)
         }
     }
 }
 
 /* Receives the map of feedback each tick */
-func feedbackOutput(data chan map[string]int){
+func feedbackOutput(data chan map[string]string, outputWeb chan map[string]string){
     for {
         m := <-data;
         for k := range m {
-            fmt.Printf("%s had %d feedback hits\n", k, m[k]);
+            if(k != "tick") { fmt.Printf("%s had %d feedback hits\n", k, m[k]); }
+        }
+
+        select {
+            case outputWeb<-m:
+            default:
         }
     }
+}
+
+func socketHandler(data chan map[string]string) websocket.Handler {
+  return func(ws *websocket.Conn) {
+    for { 
+        m := <-data;
+        var res = "Tick " + m["tick"] +": "
+      
+        if(m["1"] == "" && m["-1"] == "") {
+            res = res + "no buys/sells"
+        } else {
+            if(m["1"] != "") { res = res + m["1"] + " buys" }
+            if(m["1"] != "" && m["-1"] != "") { res = res + " and " }
+            if(m["-1"] != "") { res = res + m["-1"] + " sells" }
+        }
+        _, err := ws.Write([]byte(res))
+        if err != nil {
+            break
+        }
+    }
+  }
 }

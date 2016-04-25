@@ -8,8 +8,10 @@ import (
     "math"
     "encoding/json"
     "io/ioutil"
+    "net/http"
 
     "github.com/santegoeds/oanda"
+    "golang.org/x/net/websocket"
 )
 
 /* API login info */
@@ -39,15 +41,24 @@ func main() {
     d := make(chan dataType, 1024);
     proc := make(chan float64);
     fba := make(chan string);
-    fbo := make(chan map[string]int);
-    tick := make(chan int);
+    fbo := make(chan map[string]string);
+    fboweb := make(chan map[string]string);
+    tick := make(chan float64);
 
     go acceptor(server, joiningClients);
     go handler(joiningClients, d, fba);
     go processData(proc, d, tick)
     go historicalData(proc);
     go feedbackAccumulator(fba, tick, fbo);
-    feedbackOutput(fbo);
+    go feedbackOutput(fbo, fboweb);
+
+
+    http.Handle("/web", websocket.Handler(socketHandler(fboweb)))
+    http.Handle("/", http.FileServer(http.Dir(".")))
+    err := http.ListenAndServe(":8080", nil)
+    if err != nil {
+        panic("Error: " + err.Error())
+    }
 }
 
 /* Thread for accepting new clients. Listens for clients, accepts their connections and writes
@@ -137,18 +148,18 @@ func historicalData(proc chan float64) {
     for {
         for i := 0; i < len(data.Candles); i++ {
             proc <- data.Candles[i].Bid
-            time.Sleep(2 * time.Second)
+            time.Sleep(500 * time.Millisecond)
         }
     }
 }
 
 
 /* Thread that processes the data and writes it to the input channel for broadcasting */
-var sampleSize, n = 50, 0
+var sampleSize, n = 40, 0
 var runningMean, runningSumSq float64 = 0, 0
 var queue = make([]float64, 0)
 
-func processData(in chan float64, out chan dataType, tick chan int) float64 {
+func processData(in chan float64, out chan dataType, tick chan float64) float64 {
     for {
         lastVal := <-in
         queue = append(queue, lastVal)
@@ -172,7 +183,7 @@ func processData(in chan float64, out chan dataType, tick chan int) float64 {
             sd = math.Sqrt(runningSumSq/float64(n-1))
         }
         out <- dataType{lastVal, sd}
-        tick <- 0
+        tick <- lastVal
         fmt.Printf("%f, %f written\n", lastVal, sd)
     }
 }
