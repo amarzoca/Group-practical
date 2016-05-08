@@ -21,12 +21,13 @@ var accountId oanda.Id = 0
 /* The data to be sent out each tick */
 type dataType struct {
     val float64 //instrument value
+    mean float64 
     sd float64 //standard deviation
 }
 
 /* Format the data as a string for sending */
 func (d dataType) toString() string {
-    return (strconv.FormatFloat(float64(d.val), 'f', -1, 64) + ", " +
+    return (strconv.FormatFloat(float64(d.mean), 'f', -1, 64) + ", " +
             strconv.FormatFloat(float64(d.sd), 'f', -1, 64))
 }
 
@@ -43,7 +44,7 @@ func main() {
     fba := make(chan string);
     fbo := make(chan map[string]string);
     fboweb := make(chan map[string]string);
-    tick := make(chan float64);
+    tick := make(chan dataType);
 
     go acceptor(server, joiningClients);
     go handler(joiningClients, d, fba);
@@ -130,7 +131,8 @@ func historicalData(proc chan float64) {
         Instrument string
         Granularity string
         Candles []struct {
-            Time time.Time
+            //Time time.Time
+            Time string
             Bid float64
             Complete bool
         }
@@ -155,11 +157,11 @@ func historicalData(proc chan float64) {
 
 
 /* Thread that processes the data and writes it to the input channel for broadcasting */
-var sampleSize, n = 40, 0
+var sampleSize, n = 15, 0
 var runningMean, runningSumSq float64 = 0, 0
 var queue = make([]float64, 0)
 
-func processData(in chan float64, out chan dataType, tick chan float64) float64 {
+func processData(in chan float64, out chan dataType, tick chan dataType) float64 {
     for {
         lastVal := <-in
         queue = append(queue, lastVal)
@@ -182,8 +184,8 @@ func processData(in chan float64, out chan dataType, tick chan float64) float64 
         if(n > 1) {
             sd = math.Sqrt(runningSumSq/float64(n-1))
         }
-        out <- dataType{lastVal, sd}
-        tick <- lastVal
+        out <- dataType{lastVal, runningMean, sd}
+        tick <- dataType{lastVal, runningMean, sd}
         fmt.Printf("%f, %f written\n", lastVal, sd)
     }
 }

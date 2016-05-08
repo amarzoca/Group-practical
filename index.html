@@ -4,6 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+<script src="Chart.js"></script>
 <script>
  
   var serversocket = new WebSocket("ws://localhost:8080/web");
@@ -20,7 +21,9 @@
     var tick = array[0];
     var buys = array[1];
     var sells = array[2];
-    console.log(tick + buys + sells);
+    var mean = array[3]
+    var sd = array[4]
+    console.log(tick + buys + sells + mean + sd);
 
     var highlight = "";
     if (array[1] - array[2] > 0 && array[1] > 0)
@@ -28,21 +31,129 @@
     else if(array[2] > 0) 
       highlight = "list-group-item-danger";
 
+    addData(array.map(parseFloat))
+
     $('#list').prepend(
       "<li class='list-group-item " + highlight +" '> <span class='label label-default label-pill pull-xs-right '>" + array[1] + "</span> <span class='label label-default label-pill pull-xs-right'>" + array[2] + "</span> Tick received: " + array[0] + "</li>"
     );
 
-    //document.getElementById('comms').innerHTML += "Received: " + e.data + "<br>";         
+    if ($('#list li').length > 10) {
+        $('#list li:last').remove();
+    }
+     
   };
+
+  var randomColorFactor = function() {
+            return Math.round(Math.random() * 255);
+        };
+  var randomColor = function(opacity) {
+      return 'rgba(' + randomColorFactor() + ',' + randomColorFactor() + ',' + randomColorFactor() + ',' + (opacity || '.3') + ')';
+  };
+
+  window.onload = function() {
+            var ctx = document.getElementById("canvas").getContext("2d");
+            window.myLine = new Chart(ctx, config);
+        };
  
- 
+  var config = {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: []
+    },
+    options: {
+      responsive: true,
+      title:{
+        display:true,
+        text:'Gaming the Market - Bollinger Band'
+      },
+      tooltips: {
+        mode: 'label',
+        hover: {
+          mode: 'dataset'
+        },
+        scales: {
+          xAxes: [{
+            display: true,
+            scaleLabel: {
+              show: true,
+              labelString: 'Time'
+            }
+          }],
+          yAxes: [{
+            display: true,
+            scaleLabel: {
+              show: true,
+              labelString: 'Value'
+            },
+            ticks: {
+              suggestedMin: 10,
+              suggestedMax: 1000,
+            }
+          }]
+        }
+      }
+    }
+  }
+
+  function addDataset(name) {
+    var newDataset = {
+      label: name,
+      borderColor: randomColor(0.4),
+      fill: false,
+      //backgroundColor: randomColor(0.5),
+      pointBorderColor: randomColor(0.7),
+      pointBackgroundColor: randomColor(0.5),
+      pointBorderWidth: 1,
+      data: [],
+    };
+
+
+    config.data.datasets.push(newDataset);
+  }
+
+  addDataset("Tick")
+  addDataset("Mean")
+  addDataset("Mean + SD")
+  addDataset("Mean - SD")
+
+  
+
+  function addData(array) {
+    config.data.labels.push("");
+
+    /*$.each(config.data.datasets, function(i, dataset) {
+      dataset.data.push(value);
+    });*/
+    config.data.datasets[0].data.push(array[0])
+    config.data.datasets[1].data.push(array[3])
+    config.data.datasets[2].data.push(array[3] + array[4])
+    config.data.datasets[3].data.push(array[3] - array[4])
+
+    if(config.data.labels.length > 60) {
+      config.data.labels.splice(0, 1); // remove the label first
+
+      config.data.datasets.forEach(function(dataset, datasetIndex) {
+        dataset.data.shift();
+      });
+    }
+
+    window.myLine.update();
+
+  }
 </script>
  
 </head>
 <body>
   <div class="container">
-    <ul id="list" class="list-group"> </ul>
-
+    <div class="row">
+      <div style ="width:80%; display:block; margin:auto;">
+       <canvas id="canvas" style="display:block; margin:auto;"></canvas>
+      </div>
+    </div>
+    <div class = "row">
+      <ul id="list" class="list-group"> </ul>
+    </div>
   </div>
  
 </body>

@@ -29,7 +29,7 @@ func feedbackListener(client net.Conn, fba chan string){
 }
 
 /* Thread to accumulate all feedback from clients into a map each tick */
-func feedbackAccumulator(fba chan string, tick chan float64, 
+func feedbackAccumulator(fba chan string, tick chan dataType, 
         output chan map[string]string){
     var m map[string]string
     for {
@@ -40,7 +40,9 @@ func feedbackAccumulator(fba chan string, tick chan float64,
             case tick := <-tick:
                 output <- m
                 m = make(map[string]string)
-                m["tick"] = strconv.FormatFloat(tick, 'f', -1, 64)
+                m["tick"] = strconv.FormatFloat(tick.val, 'f', -1, 64)
+                m["mean"] = strconv.FormatFloat(tick.mean, 'f', -1, 64)
+                m["sd"] = strconv.FormatFloat(tick.sd, 'f', -1, 64)
         }
     }
 }
@@ -50,7 +52,9 @@ func feedbackOutput(data chan map[string]string, outputWeb chan map[string]strin
     for {
         m := <-data;
         for k := range m {
-            if(k != "tick") { fmt.Printf("%s had %s feedback hits\n", k, m[k]); }
+            if(k != "tick" && k != "mean" && k != "sd") { 
+                fmt.Printf("%s had %s feedback hits\n", k, m[k]); 
+            }
         }
 
         select {
@@ -75,7 +79,8 @@ func socketHandler(data chan map[string]string) websocket.Handler {
         }*/
         if(m["1"] == "") { m["1"] = "0" }
         if(m["-1"] == "") { m["-1"] = "0" }
-        var res = m["tick"] + ", " + m["1"] + ", " + m["-1"]
+        var res = m["tick"] + ", " + m["1"] + ", " + m["-1"] + ", " + m["mean"] + ", " + m["sd"]
+
         _, err := ws.Write([]byte(res))
         if err != nil {
             break
