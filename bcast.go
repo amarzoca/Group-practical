@@ -42,8 +42,8 @@ func main() {
     d := make(chan dataType, 1024);
     proc := make(chan float64);
     fba := make(chan string);
-    fbo := make(chan map[string]string);
-    fboweb := make(chan map[string]string);
+    fbo := make(chan feedbackMapsTypeBecauseGoHasNoPairsWhichIsDumb);
+    fboweb := make(chan feedbackMapsTypeBecauseGoHasNoPairsWhichIsDumb);
     tick := make(chan dataType);
 
     go acceptor(server, joiningClients);

@@ -6,6 +6,7 @@ import (
     "fmt"
     "strings"
     "strconv"
+    "encoding/json"
 
     "golang.org/x/net/websocket"
 )
@@ -28,17 +29,37 @@ func feedbackListener(client net.Conn, fba chan string){
     }
 }
 
+type feedbackMapsTypeBecauseGoHasNoPairsWhichIsDumb struct {
+    Hitmap map[string]string
+    Scoremap map[string]string
+}
+
 /* Thread to accumulate all feedback from clients into a map each tick */
-func feedbackAccumulator(fba chan string, tick chan dataType, 
-        output chan map[string]string){
+func feedbackAccumulator(fba chan string, tick chan dataType, output chan feedbackMapsTypeBecauseGoHasNoPairsWhichIsDumb){
     var m map[string]string
+    var hs map[string]string
+    var hstime map[string]int
     for {
         select {
             case v := <-fba:
-                i, _ := strconv.Atoi(m[v])
-                m[v] = strconv.Itoa(i + 1)
+                vdata := strings.Split(v, ":")
+                if(vdata[0] == "move"){
+                    i, _ := strconv.Atoi(m[v])
+                    m[v] = strconv.Itoa(i + 1)
+                } else if(vdata[0] == "score"){
+                    hs[vdata[1]] = vdata[2]
+                    hstime[vdata[1]] = 25
+                } else{
+                    //wtf
+                }
             case tick := <-tick:
-                output <- m
+                for nick := range hstime {
+                    hstime[nick] := hstime[nick] - 1;
+                    if(hstime[nick] == 0){
+                        delete(hs, nick)
+                    }
+                }
+                output <- feedbackMapsTypeBecauseGoHasNoPairsWhichIsDumb{m,hs}
                 m = make(map[string]string)
                 m["tick"] = strconv.FormatFloat(tick.val, 'f', -1, 64)
                 m["mean"] = strconv.FormatFloat(tick.mean, 'f', -1, 64)
@@ -48,12 +69,12 @@ func feedbackAccumulator(fba chan string, tick chan dataType,
 }
 
 /* Receives the map of feedback each tick */
-func feedbackOutput(data chan map[string]string, outputWeb chan map[string]string){
+func feedbackOutput(data chan feedbackMapsTypeBecauseGoHasNoPairsWhichIsDumb, outputWeb chan feedbackMapsTypeBecauseGoHasNoPairsWhichIsDumb){
     for {
         m := <-data;
-        for k := range m {
+        for k := range m.Hitmap {
             if(k != "tick" && k != "mean" && k != "sd") { 
-                fmt.Printf("%s had %s feedback hits\n", k, m[k]); 
+                fmt.Printf("%s had %s feedback hits\n", k, m.Hitmap[k]); 
             }
         }
 
@@ -64,24 +85,19 @@ func feedbackOutput(data chan map[string]string, outputWeb chan map[string]strin
     }
 }
 
-func socketHandler(data chan map[string]string) websocket.Handler {
+func socketHandler(data chan feedbackMapsTypeBecauseGoHasNoPairsWhichIsDumb) websocket.Handler {
   return func(ws *websocket.Conn) {
     for { 
-        m := <-data;
-        /*var res = "Tick " + m["tick"] +": "
-      
-        if(m["1"] == "" && m["-1"] == "") {
-            res = res + "no buys/sells"
-        } else {
-            if(m["1"] != "") { res = res + m["1"] + " buys" }
-            if(m["1"] != "" && m["-1"] != "") { res = res + " and " }
-            if(m["-1"] != "") { res = res + m["-1"] + " sells" }
-        }*/
+        i := <-data;
+        m := i.Hitmap;
         if(m["1"] == "") { m["1"] = "0" }
         if(m["-1"] == "") { m["-1"] = "0" }
-        var res = m["tick"] + ", " + m["1"] + ", " + m["-1"] + ", " + m["mean"] + ", " + m["sd"]
+        //var res = m["tick"] + ", " + m["1"] + ", " + m["-1"] + ", " + m["mean"] + ", " + m["sd"]
 
-        _, err := ws.Write([]byte(res))
+        j, _ := json.Marshal(i)
+        _, err := ws.Write([]byte(string(j)))
+
+        //_, err := ws.Write([]byte(res))
         if err != nil {
             break
         }
