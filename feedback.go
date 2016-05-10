@@ -54,7 +54,7 @@ func feedbackAccumulator(fba chan string, tick chan dataType, output chan feedba
                 }
             case tick := <-tick:
                 for nick := range hstime {
-                    hstime[nick] := hstime[nick] - 1;
+                    hstime[nick] = hstime[nick] - 1;
                     if(hstime[nick] == 0){
                         delete(hs, nick)
                     }

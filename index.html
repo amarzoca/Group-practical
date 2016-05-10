@@ -15,16 +15,19 @@
  
   // Write message on receive
   serversocket.onmessage = function(e) {
-   // console.log(e.data);
-    var array = e.data.split(",");
+    //console.log(JSON.parse(e.data));
+    var object = JSON.parse(e.data);
+    var activity = object.Hitmap;
+    var scores = object.Scoremap;
 
-    var tick = array[0];
-    var buys = array[1];
-    var sells = array[2];
-    var mean = array[3]
-    var sd = array[4]
+    var tick = activity["tick"];
+    var buys = activity["1"];
+    var sells = activity["-1"];
+    var mean = activity["mean"]
+    var sd = activity["sd"];
+    var array = new Array(tick, buys, sells, mean, sd);
     array = array.map(parseFloat)
-    console.log(tick + buys + sells + mean + sd);
+    //console.log(array);
 
     var highlight = "";
     if (array[1] - array[2] > 0 && array[1] > 0)
@@ -39,12 +42,13 @@
       var data = new Array(x, x + 2, x - 2)
     }
     addData(data)
+    addScores(scores)
 
     $('#list').prepend(
       "<li class='list-group-item " + highlight +" '> <span class='label label-default label-pill pull-xs-right '>" + array[1] + "</span> <span class='label label-default label-pill pull-xs-right'>" + array[2] + "</span> Tick received: " + array[0] + "</li>"
     );
 
-    if ($('#list li').length > 60) {
+    if ($('#list li').length > 10) {
         $('#list li:last').remove();
     }
      
@@ -147,10 +151,32 @@
     }
 
     window.myLine.update();
-
   }
 
- 
+  function addScores(scores) {
+    scoresFake = {
+      FakeUser1: 100,
+      FakeUser2: 251,
+      FakeUser3: 31,
+    }
+    var scoresArray = $.map(scores, function(val, key) {
+        return { score: parseInt(val), user: key};
+      });
+
+    //console.log(scoresArray)
+    scoresArray.sort(function(a, b) {
+      return b.score - a.score;
+    }) 
+    console.log(scoresArray)
+
+    $('#table_body').empty()
+    scoresArray.forEach(function(scoreObj) {
+      $('#table_body').append("<tr> <td>" + scoreObj.user + "</td> <td> " + scoreObj.score + "</td> </tr>")
+    })
+
+    if(scoresArray.length == 0)
+      $('#table_body').append("<tr><td> No users playing </td><td></td></tr>")
+  }
 
   $(document).ready(function () {
     var ctx = document.getElementById("canvas").getContext("2d");
@@ -164,12 +190,23 @@
 <body>
   <div class="container">
     <div class="row">
-      <div style ="width:80%; display:block; margin:auto;">
-       <canvas id="canvas" style="display:block; margin:auto;"></canvas>
+      <div class="col-md-9">
+       <canvas id="canvas"></canvas>
+       <ul id="list" class="list-group"> </ul>
       </div>
-    </div>
-    <div class = "row">
-      <ul id="list" class="list-group"> </ul>
+      <div class="col-md-3 table-responsive">
+        <h2> <small> Leaderboard </small> </h2>
+        <table class="table table-hover table-striped">
+          <thead>
+            <tr>
+              <th class="col-md-8"> User </th>
+              <th class="col-md-4"> Score </th>
+            </tr>
+          </thead>
+          <tbody id="table_body">
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
  
