@@ -27,7 +27,7 @@ type dataType struct {
 
 /* Format the data as a string for sending */
 func (d dataType) toString() string {
-    return (strconv.FormatFloat(float64(d.mean), 'f', -1, 64) + ", " +
+    return (strconv.FormatFloat(float64(d.val - d.mean), 'f', -1, 64) + ", " +
             strconv.FormatFloat(float64(d.sd), 'f', -1, 64))
 }
 
@@ -90,6 +90,7 @@ func handler(joiningClients chan net.Conn, input chan dataType, fba chan string)
                 for _, elem := range conn {
                     elem.Write([]byte("" + i.toString() + "\n"))
                 }
+                fmt.Printf("%s written\n", i.toString())
         }
     }
 }
@@ -150,14 +151,14 @@ func historicalData(proc chan float64) {
     for {
         for i := 0; i < len(data.Candles); i++ {
             proc <- data.Candles[i].Bid
-            time.Sleep(500 * time.Millisecond)
+            time.Sleep(100 * time.Millisecond)
         }
     }
 }
 
 
 /* Thread that processes the data and writes it to the input channel for broadcasting */
-var sampleSize, n = 15, 0
+var sampleSize, n = 30, 0
 var runningMean, runningSumSq float64 = 0, 0
 var queue = make([]float64, 0)
 
@@ -186,7 +187,6 @@ func processData(in chan float64, out chan dataType, tick chan dataType) float64
         }
         out <- dataType{lastVal, runningMean, sd}
         tick <- dataType{lastVal, runningMean, sd}
-        fmt.Printf("%f, %f written\n", lastVal, sd)
     }
 }
 

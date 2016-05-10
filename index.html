@@ -15,7 +15,7 @@
  
   // Write message on receive
   serversocket.onmessage = function(e) {
-    console.log(e.data);
+   // console.log(e.data);
     var array = e.data.split(",");
 
     var tick = array[0];
@@ -23,6 +23,7 @@
     var sells = array[2];
     var mean = array[3]
     var sd = array[4]
+    array = array.map(parseFloat)
     console.log(tick + buys + sells + mean + sd);
 
     var highlight = "";
@@ -31,13 +32,19 @@
     else if(array[2] > 0) 
       highlight = "list-group-item-danger";
 
-    addData(array.map(parseFloat))
+    if(scaled == false) 
+      var data = new Array(array[0], array[3], array[3] + 2*array[4], array[3] - 2*array[4])
+    else {
+      var x = (array[0] - array[3])/array[4]
+      var data = new Array(x, x + 2, x - 2)
+    }
+    addData(data)
 
     $('#list').prepend(
       "<li class='list-group-item " + highlight +" '> <span class='label label-default label-pill pull-xs-right '>" + array[1] + "</span> <span class='label label-default label-pill pull-xs-right'>" + array[2] + "</span> Tick received: " + array[0] + "</li>"
     );
 
-    if ($('#list li').length > 10) {
+    if ($('#list li').length > 60) {
         $('#list li:last').remove();
     }
      
@@ -49,11 +56,6 @@
   var randomColor = function(opacity) {
       return 'rgba(' + randomColorFactor() + ',' + randomColorFactor() + ',' + randomColorFactor() + ',' + (opacity || '.3') + ')';
   };
-
-  window.onload = function() {
-            var ctx = document.getElementById("canvas").getContext("2d");
-            window.myLine = new Chart(ctx, config);
-        };
  
   var config = {
     type: 'line',
@@ -65,7 +67,7 @@
       responsive: true,
       title:{
         display:true,
-        text:'Gaming the Market - Bollinger Band'
+        text:'Gaming the Market - Bollinger Bands'
       },
       tooltips: {
         mode: 'label',
@@ -92,6 +94,9 @@
             }
           }]
         }
+      },
+      animation: {
+        duration: 2000
       }
     }
   }
@@ -112,23 +117,26 @@
     config.data.datasets.push(newDataset);
   }
 
-  addDataset("Tick")
-  addDataset("Mean")
-  addDataset("Mean + SD")
-  addDataset("Mean - SD")
-
+  var scaled = (window.location.search.split("=")[1] == 1);
+  console.log(scaled)
+  if(scaled) {
+    addDataset("(Tick - Mean)/SD")
+    addDataset("(Tick - Mean)/SD + 2")
+    addDataset("(Tick - Mean)/SD - 2")
+  }
+  else {
+    addDataset("Tick")
+    addDataset("Mean")
+    addDataset("Mean + 2*SD")
+    addDataset("Mean - 2*SD")
+  }
   
-
   function addData(array) {
     config.data.labels.push("");
 
-    /*$.each(config.data.datasets, function(i, dataset) {
-      dataset.data.push(value);
-    });*/
-    config.data.datasets[0].data.push(array[0])
-    config.data.datasets[1].data.push(array[3])
-    config.data.datasets[2].data.push(array[3] + array[4])
-    config.data.datasets[3].data.push(array[3] - array[4])
+    $.each(config.data.datasets, function(i, dataset) {
+      dataset.data.push(array[i]);
+    });
 
     if(config.data.labels.length > 60) {
       config.data.labels.splice(0, 1); // remove the label first
@@ -141,6 +149,15 @@
     window.myLine.update();
 
   }
+
+ 
+
+  $(document).ready(function () {
+    var ctx = document.getElementById("canvas").getContext("2d");
+    window.myLine = new Chart(ctx, config);
+
+  });
+
 </script>
  
 </head>
