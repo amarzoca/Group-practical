@@ -34,23 +34,40 @@ type feedbackMapsTypeBecauseGoHasNoPairsWhichIsDumb struct {
     Scoremap map[string]string
 }
 
+type BestUser struct {
+    Username string
+    Score string
+}
+
 /* Thread to accumulate all feedback from clients into a map each tick */
 func feedbackAccumulator(fba chan string, tick chan dataType, output chan feedbackMapsTypeBecauseGoHasNoPairsWhichIsDumb){
-    var m map[string]string
-    var hs map[string]string
-    var hstime map[string]int
+    var m map[string]string = make(map[string]string)
+    var hs map[string]string = make(map[string]string)
+    var hstime map[string]int = make(map[string]int)
+    var best BestUser = BestUser{"anon", "0"}
+
     for {
         select {
             case v := <-fba:
                 vdata := strings.Split(v, ":")
+                fmt.Println(vdata) 
                 if(vdata[0] == "move"){
-                    i, _ := strconv.Atoi(m[v])
-                    m[v] = strconv.Itoa(i + 1)
+                    i, _ := strconv.Atoi(m[vdata[1]])
+                    m[vdata[1]] = strconv.Itoa(i + 1)
                 } else if(vdata[0] == "score"){
                     hs[vdata[1]] = vdata[2]
-                    hstime[vdata[1]] = 25
+                    hstime[vdata[1]] = 50
+
+                    val, _ := strconv.ParseFloat(vdata[2], 64)
+                    newVal := int(val)
+                    oldVal, _ := strconv.Atoi(best.Score)
+
+                    if(newVal > oldVal) {
+                        best = BestUser {vdata[1], vdata[2]}
+                    }
+                    fmt.Println(best.Score)
                 } else{
-                    //wtf
+                    fmt.Println(vdata) 
                 }
             case tick := <-tick:
                 for nick := range hstime {
@@ -59,11 +76,14 @@ func feedbackAccumulator(fba chan string, tick chan dataType, output chan feedba
                         delete(hs, nick)
                     }
                 }
+
                 output <- feedbackMapsTypeBecauseGoHasNoPairsWhichIsDumb{m,hs}
                 m = make(map[string]string)
                 m["tick"] = strconv.FormatFloat(tick.val, 'f', -1, 64)
                 m["mean"] = strconv.FormatFloat(tick.mean, 'f', -1, 64)
                 m["sd"] = strconv.FormatFloat(tick.sd, 'f', -1, 64)
+                m["bestUser"] = best.Username
+                m["bestScore"] = best.Score
         }
     }
 }
@@ -73,13 +93,14 @@ func feedbackOutput(data chan feedbackMapsTypeBecauseGoHasNoPairsWhichIsDumb, ou
     for {
         m := <-data;
         for k := range m.Hitmap {
-            if(k != "tick" && k != "mean" && k != "sd") { 
+            if(k != "tick" && k != "mean" && k != "sd" && 
+                k != "bestScore" && k != "bestUser") { 
                 fmt.Printf("%s had %s feedback hits\n", k, m.Hitmap[k]); 
             }
         }
 
         select {
-            case outputWeb<-m:
+            case outputWeb<-m: 
             default:
         }
     }

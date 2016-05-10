@@ -15,7 +15,7 @@
  
   // Write message on receive
   serversocket.onmessage = function(e) {
-    //console.log(JSON.parse(e.data));
+    console.log(e.data);
     var object = JSON.parse(e.data);
     var activity = object.Hitmap;
     var scores = object.Scoremap;
@@ -43,6 +43,9 @@
     }
     addData(data)
     addScores(scores)
+
+    if(activity.bestScore != null)
+      $('#best').html("<tr><td>" + activity.bestUser + "</td><td>" + parseInt(activity.bestScore) + "</td></tr>")
 
     $('#list').prepend(
       "<li class='list-group-item " + highlight +" '> <span class='label label-default label-pill pull-xs-right '>" + array[1] + "</span> <span class='label label-default label-pill pull-xs-right'>" + array[2] + "</span> Tick received: " + array[0] + "</li>"
@@ -167,7 +170,7 @@
     scoresArray.sort(function(a, b) {
       return b.score - a.score;
     }) 
-    console.log(scoresArray)
+    //console.log(scoresArray)
 
     $('#table_body').empty()
     scoresArray.forEach(function(scoreObj) {
@@ -195,7 +198,7 @@
        <ul id="list" class="list-group"> </ul>
       </div>
       <div class="col-md-3 table-responsive">
-        <h2> <small> Leaderboard </small> </h2>
+        <h2> <small> Live leaderboard </small> </h2>
         <table class="table table-hover table-striped">
           <thead>
             <tr>
@@ -204,6 +207,16 @@
             </tr>
           </thead>
           <tbody id="table_body">
+          </tbody>
+        </table>
+        
+        <table class="table table-hover table-striped">
+          <thead>
+            <tr>
+              <th class="col-md-8"> Best all-time player</th>
+            </tr>
+          </thead>
+          <tbody id="best">
           </tbody>
         </table>
       </div>
