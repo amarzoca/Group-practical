@@ -50,7 +50,6 @@ func feedbackAccumulator(fba chan string, tick chan dataType, output chan feedba
         select {
             case v := <-fba:
                 vdata := strings.Split(v, ":")
-                fmt.Println(vdata) 
                 if(vdata[0] == "move"){
                     i, _ := strconv.Atoi(m[vdata[1]])
                     m[vdata[1]] = strconv.Itoa(i + 1)
@@ -58,14 +57,13 @@ func feedbackAccumulator(fba chan string, tick chan dataType, output chan feedba
                     hs[vdata[1]] = vdata[2]
                     hstime[vdata[1]] = 50
 
-                    val, _ := strconv.ParseFloat(vdata[2], 64)
-                    newVal := int(val)
-                    oldVal, _ := strconv.Atoi(best.Score)
+                    newVal, _ := strconv.ParseFloat(vdata[2], 64)
+                    //newVal := int(val)
+                    oldVal, _ := strconv.ParseFloat(best.Score, 64)
 
                     if(newVal > oldVal) {
                         best = BestUser {vdata[1], vdata[2]}
                     }
-                    fmt.Println(best.Score)
                 } else{
                     fmt.Println(vdata) 
                 }
